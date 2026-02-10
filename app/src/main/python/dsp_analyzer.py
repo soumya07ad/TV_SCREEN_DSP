@@ -1,29 +1,20 @@
 """
-DSP Analyzer for TV Screen Crack Detection
-Uses numpy for accurate FFT-based frequency analysis
+Pure Python DSP Analyzer for TV Screen Crack Detection
+No external dependencies - uses only Python standard library
 """
 
 import wave
 import struct
-import numpy as np
+import math
 from typing import Dict
 
 
 def analyze_audio(wav_path: str) -> Dict:
     """
-    Main entry point for audio analysis using numpy FFT.
+    Main entry point for audio analysis using pure Python.
     
-    Args:
-        wav_path: Absolute path to WAV file
-        
-    Returns:
-        Dictionary with:
-        - frequency: Dominant frequency in Hz
-        - power: Signal power in dB
-        - surface_tension: Spectral flatness metric
-        - noise_status: "CRACK" | "NORMAL" | "NOISE"
-        - confidence: 0.0 to 1.0
-        - error: Error message if failed
+    Returns dictionary with all 5 required keys:
+    - frequency, power, surface_tension, noise_status, confidence
     """
     try:
         # Read WAV file
@@ -52,11 +43,11 @@ def analyze_audio(wav_path: str) -> Dict:
                 "confidence": 0.5
             }
         
-        # FFT-based frequency detection
-        frequency = find_dominant_frequency_fft(samples, sample_rate)
+        # Autocorrelation-based frequency detection
+        frequency = find_dominant_frequency(samples, sample_rate)
         
         # Calculate spectral flatness
-        surface_tension = calculate_spectral_flatness_fft(samples)
+        surface_tension = calculate_spectral_flatness(samples)
         
         # Classify
         noise_status, confidence = classify_noise(
@@ -82,9 +73,8 @@ def analyze_audio(wav_path: str) -> Dict:
         }
 
 
-
-def read_wav(filepath: str) -> tuple:
-    """Read WAV file and return numpy array of samples + sample rate."""
+def read_wav(filepath: str):
+    """Read WAV file and return normalized samples + sample rate."""
     try:
         with wave.open(filepath, 'rb') as wav:
             n_channels = wav.getnchannels()
@@ -95,116 +85,98 @@ def read_wav(filepath: str) -> tuple:
             # Read all frames
             raw_data = wav.readframes(n_frames)
             
-            # Unpack based on sample width (16-bit PCM)
-            if sample_width == 2:
-                samples = np.frombuffer(raw_data, dtype=np.int16)
+            # Unpack based on sample width
+            if sample_width == 2:  # 16-bit PCM
+                fmt = f'{n_frames * n_channels}h'
+                samples = struct.unpack(fmt, raw_data)
             else:
-                return np.array([]), 0
+                return [], 0
             
             # Convert to mono if stereo
             if n_channels == 2:
-                samples = samples[::2]
+                samples = [samples[i] for i in range(0, len(samples), 2)]
             
             # Normalize to -1.0 to 1.0
-            samples = samples.astype(np.float32) / 32768.0
+            max_val = 32768.0
+            normalized = [s / max_val for s in samples]
             
-            return samples, framerate
+            return normalized, framerate
             
     except Exception:
-        return np.array([]), 0
+        return [], 0
 
 
-def calculate_power_db(samples: np.ndarray) -> float:
+def calculate_power_db(samples):
     """Calculate RMS power in dB."""
-    if len(samples) == 0:
+    if not samples:
         return -100.0
     
     # RMS
-    rms = np.sqrt(np.mean(samples ** 2))
+    sum_squares = sum(s * s for s in samples)
+    rms = math.sqrt(sum_squares / len(samples))
     
     # Convert to dB (avoid log(0))
     if rms < 1e-10:
         return -100.0
     
-    db = 20 * np.log10(rms)
-    return float(db)
+    db = 20 * math.log10(rms)
+    return db
 
 
-def find_dominant_frequency_fft(samples: np.ndarray, sample_rate: int) -> float:
+def find_dominant_frequency(samples, sample_rate):
     """
-    Find dominant frequency using FFT.
-    More accurate than autocorrelation method.
-    """
-    if len(samples) < 100:
-        return 0.0
-    
-    # Apply Hanning window to reduce spectral leakage
-    window = np.hanning(len(samples))
-    windowed = samples * window
-    
-    # Compute FFT (only positive frequencies)
-    fft = np.fft.rfft(windowed)
-    magnitude = np.abs(fft)
-    
-    # Find peak frequency
-    freqs = np.fft.rfftfreq(len(samples), 1.0 / sample_rate)
-    
-    # Ignore DC component and very low frequencies
-    valid_idx = freqs > 20
-    if not np.any(valid_idx):
-        return 0.0
-    
-    magnitude_valid = magnitude[valid_idx]
-    freqs_valid = freqs[valid_idx]
-    
-    # Find peak
-    peak_idx = np.argmax(magnitude_valid)
-    dominant_freq = freqs_valid[peak_idx]
-    
-    return float(dominant_freq)
-
-
-def calculate_spectral_flatness_fft(samples: np.ndarray) -> float:
-    """
-    Calculate spectral flatness using FFT.
-    Flatness = geometric_mean / arithmetic_mean
-    Higher values indicate more noise-like signals (cracks)
+    Find dominant frequency using autocorrelation.
+    Pure Python implementation without FFT.
     """
     if len(samples) < 100:
         return 0.0
     
-    # Apply window
-    window = np.hanning(len(samples))
-    windowed = samples * window
+    # Use first 8192 samples for speed
+    chunk_size = min(8192, len(samples))
+    signal = samples[:chunk_size]
     
-    # Compute FFT magnitude
-    fft = np.fft.rfft(windowed)
-    magnitude = np.abs(fft)
+    # Autocorrelation for lag detection
+    max_lag = min(2000, chunk_size // 2)
+    max_corr = 0.0
+    best_lag = 0
     
-    # Skip DC component
-    magnitude = magnitude[1:]
+    for lag in range(20, max_lag):  # Skip very low frequencies
+        correlation = sum(signal[i] * signal[i - lag] 
+                         for i in range(lag, len(signal)))
+        
+        if correlation > max_corr:
+            max_corr = correlation
+            best_lag = lag
     
-    # Add small epsilon to avoid log(0)
-    epsilon = 1e-10
-    magnitude = magnitude + epsilon
-    
-    # Spectral flatness = exp(mean(log(power))) / mean(power)
-    power = magnitude ** 2
-    
-    geometric_mean = np.exp(np.mean(np.log(power)))
-    arithmetic_mean = np.mean(power)
-    
-    if arithmetic_mean < epsilon:
+    if best_lag == 0:
         return 0.0
     
-    flatness = geometric_mean / arithmetic_mean
-    
-    return float(flatness)
+    frequency = sample_rate / best_lag
+    return frequency
 
 
-def classify_noise(frequency: float, power_db: float, surface_tension: float) -> tuple:
+def calculate_spectral_flatness(samples):
     """
-    Rule-based classification for crack/noise detection.
+    Calculate spectral flatness (surface tension proxy).
+    Pure Python approximation using variance.
+    """
+    if len(samples) < 100:
+        return 0.0
+    
+    # Calculate variance as proxy for spectral spread
+    mean = sum(samples) / len(samples)
+    variance = sum((s - mean) ** 2 for s in samples) / len(samples)
+    
+    # Normalize to 0-1 range
+    # Higher variance = more noise-like = higher flatness
+    flatness = min(1.0, math.sqrt(variance) * 10)
+    
+    return flatness
+
+
+def classify_noise(frequency, power_db, surface_tension):
+    """
+    Rule-based classification.
     
     Returns:
         (status, confidence)
@@ -215,31 +187,25 @@ def classify_noise(frequency: float, power_db: float, surface_tension: float) ->
         return "NOISE", 0.6
     
     # Crack detection heuristics
-    crack_score = 0.0
+    crack_indicators = 0
     
     # High frequency content (cracks are sharp/transient)
-    if frequency > 2000:
-        crack_score += 0.3
-    elif frequency > 1000:
-        crack_score += 0.15
+    if frequency > 1500:
+        crack_indicators += 1
     
-    # High spectral flatness (noise-like, characteristic of cracks)
-    if surface_tension > 0.7:
-        crack_score += 0.4
-    elif surface_tension > 0.5:
-        crack_score += 0.2
+    # High spectral flatness (noise-like)
+    if surface_tension > 0.6:
+        crack_indicators += 1
     
-    # Strong signal (cracks often have high amplitude)
-    if power_db > -15:
-        crack_score += 0.3
-    elif power_db > -25:
-        crack_score += 0.15
+    # Strong signal
+    if power_db > -20:
+        crack_indicators += 1
     
     # Classification
-    if crack_score >= 0.6:
-        confidence = min(0.95, crack_score)
+    if crack_indicators >= 2:
+        confidence = min(0.9, 0.5 + (crack_indicators * 0.2))
         return "CRACK", confidence
-    elif crack_score >= 0.3:
-        return "NORMAL", 0.65
+    elif crack_indicators == 1:
+        return "NORMAL", 0.7
     else:
         return "NORMAL", 0.8

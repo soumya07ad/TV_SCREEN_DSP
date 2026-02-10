@@ -1,8 +1,10 @@
 package com.example.tvscreendsp.ui.history
 
+import android.app.Application
 import android.media.MediaPlayer
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.tvscreendsp.data.local.AppDatabase
 import com.example.tvscreendsp.data.local.MeasurementEntity
 import com.example.tvscreendsp.data.repository.MeasurementRepository
 import kotlinx.coroutines.flow.*
@@ -13,9 +15,11 @@ import java.io.File
  * ViewModel for Audio History screen.
  * Manages measurement list and audio playback.
  */
-class AudioHistoryViewModel(
-    private val repository: MeasurementRepository
-) : ViewModel() {
+class AudioHistoryViewModel(application: Application) : AndroidViewModel(application) {
+    
+    // Database and repository
+    private val database = AppDatabase.getInstance(application.applicationContext)
+    private val repository = MeasurementRepository(database.measurementDao())
     
     // All measurements from database
     val measurements: StateFlow<List<MeasurementEntity>> =

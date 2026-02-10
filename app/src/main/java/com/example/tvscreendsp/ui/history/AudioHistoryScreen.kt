@@ -6,7 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -165,7 +165,7 @@ private fun MeasurementListItem(
             // Play/Stop button
             IconButton(onClick = onPlayToggle) {
                 Icon(
-                    imageVector = if (isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
+                    imageVector = if (isPlaying) Icons.Default.Clear else Icons.Default.PlayArrow,
                     contentDescription = if (isPlaying) "Stop" else "Play",
                     tint = MaterialTheme.colorScheme.primary
                 )

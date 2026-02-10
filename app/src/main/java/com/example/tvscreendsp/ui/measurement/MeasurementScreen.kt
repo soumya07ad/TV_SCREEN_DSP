@@ -2,6 +2,8 @@ package com.example.tvscreendsp.ui.measurement
 
 import android.Manifest
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,7 +40,7 @@ fun MeasurementScreen(
                 actions = {
                     IconButton(onClick = onNavigateToHistory) {
                         Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.History,
+                            imageVector = Icons.Default.List,
                             contentDescription = "Audio History"
                         )
                     }

@@ -30,7 +30,7 @@ android {
     // Chaquopy Python configuration
     flavorDimensions += "pyVersion"
     productFlavors {
-        create("py311") {
+        create("py38") {
             dimension = "pyVersion"
         }
     }
@@ -63,14 +63,13 @@ android {
 
 chaquopy {
     defaultConfig {
-        version = "3.11"
+        version = "3.8"
         
-        // Install numpy for accurate FFT-based DSP analysis
-        pip {
-            install("numpy==1.24.3")
-        }
+        // No pip packages - using pure Python stdlib for DSP
+        // This avoids build complications with numpy compilation
     }
 }
+
 
 dependencies {
     implementation(libs.androidx.core.ktx)
