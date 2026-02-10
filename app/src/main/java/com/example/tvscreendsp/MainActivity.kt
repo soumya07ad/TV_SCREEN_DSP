@@ -4,10 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.runtime.*
 import com.example.tvscreendsp.dsp.PythonDspBridge
-import com.example.tvscreendsp.ui.measurement.MeasurementScreen
-import com.example.tvscreendsp.ui.measurement.MeasurementViewModel
 import com.example.tvscreendsp.ui.theme.TVScreenDSPTheme
 
 /**
@@ -25,8 +23,31 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             TVScreenDSPTheme {
-                MeasurementScreen()
+                TVScreenDSPApp()
             }
         }
     }
+}
+
+@Composable
+fun TVScreenDSPApp() {
+    var currentScreen by remember { mutableStateOf<Screen>(Screen.Measurement) }
+    
+    when (currentScreen) {
+        Screen.Measurement -> {
+            com.example.tvscreendsp.ui.measurement.MeasurementScreen(
+                onNavigateToHistory = { currentScreen = Screen.History }
+            )
+        }
+        Screen.History -> {
+            com.example.tvscreendsp.ui.history.AudioHistoryScreen(
+                onNavigateBack = { currentScreen = Screen.Measurement }
+            )
+        }
+    }
+}
+
+sealed class Screen {
+    object Measurement : Screen()
+    object History : Screen()
 }

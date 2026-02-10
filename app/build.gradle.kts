@@ -65,10 +65,10 @@ chaquopy {
     defaultConfig {
         version = "3.11"
         
-        // Numpy installation failing - will add static Python or pre-built wheels
-        // pip {
-        //     install("numpy")
-        // }
+        // Install numpy for accurate FFT-based DSP analysis
+        pip {
+            install("numpy==1.24.3")
+        }
     }
 }
 

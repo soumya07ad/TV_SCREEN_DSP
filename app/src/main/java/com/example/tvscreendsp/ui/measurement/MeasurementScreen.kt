@@ -22,7 +22,8 @@ import com.google.accompanist.permissions.shouldShowRationale
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun MeasurementScreen(
-    viewModel: MeasurementViewModel = viewModel()
+    viewModel: MeasurementViewModel = viewModel(),
+    onNavigateToHistory: () -> Unit = {}
 ) {
     val recordingState by viewModel.recordingState.collectAsStateWithLifecycle()
     val analysisState by viewModel.analysisState.collectAsStateWithLifecycle()
@@ -34,6 +35,14 @@ fun MeasurementScreen(
         topBar = {
             TopAppBar(
                 title = { Text("TV Screen DSP") },
+                actions = {
+                    IconButton(onClick = onNavigateToHistory) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.History,
+                            contentDescription = "Audio History"
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
