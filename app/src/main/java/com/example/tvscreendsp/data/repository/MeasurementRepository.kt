@@ -76,8 +76,10 @@ class MeasurementRepository(private val measurementDao: MeasurementDao) {
     }
     
     /**
-     * Retrieves all measurements as a reactive Flow.
-     * Ordered by recordedAt descending (newest first).
+     * Returns all measurements as a reactive Flow.
+     * 
+     * UI will automatically update when measurements are added/updated/deleted.
+     * Sorted by recordedAt timestamp (newest first).
      */
     fun getAllMeasurements(): Flow<List<MeasurementEntity>> {
         return measurementDao.getAllMeasurements()
@@ -98,15 +100,36 @@ class MeasurementRepository(private val measurementDao: MeasurementDao) {
     }
     
     /**
-     * Deletes a measurement by ID.
+     * Deletes a measurement and its associated WAV file.
      * 
-     * Note: Does NOT delete the associated WAV file.
-     * Caller should handle file cleanup separately.
-     * 
-     * @return true if deleted, false if not found
+     * @param measurement The measurement to delete
+     * @return true if deletion was successful
      */
-    suspend fun deleteMeasurement(id: Long): Boolean {
-        return measurementDao.deleteById(id) > 0
+    suspend fun deleteMeasurement(measurement: MeasurementEntity): Boolean {
+        return try {
+            // Delete WAV file if it exists
+            val wavFile = java.io.File(measurement.wavFilePath)
+            if (wavFile.exists()) {
+                wavFile.delete()
+            }
+            
+            // Delete database record
+            measurementDao.delete(measurement)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    /**
+     * Updates the custom name of a measurement.
+     * 
+     * @param id The measurement ID
+     * @param newName The new custom name (empty string to clear)
+     */
+    suspend fun renameMeasurement(id: Long, newName: String) {
+        val finalName = if (newName.isBlank()) null else newName.trim()
+        measurementDao.updateCustomName(id, finalName)
     }
     
     /**

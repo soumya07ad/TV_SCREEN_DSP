@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Room Database for the TV Screen DSP application.
@@ -31,7 +33,7 @@ import androidx.room.RoomDatabase
  */
 @Database(
     entities = [MeasurementEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -62,15 +64,26 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
         
+        
+        /**
+         * Migration from version 1 to 2: Add customName column.
+         */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE measurements ADD COLUMN customName TEXT DEFAULT NULL"
+                )
+            }
+        }
+        
         private fun buildDatabase(context: Context): AppDatabase {
             return Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 DATABASE_NAME
             )
-                // For development: destroy and recreate if no migration path exists
-                // TODO: Remove .fallbackToDestructiveMigration() in production
-                //       and implement proper migrations instead
+                .addMigrations(MIGRATION_1_2)
+                // Fallback if migration fails (dev only)
                 .fallbackToDestructiveMigration()
                 .build()
         }

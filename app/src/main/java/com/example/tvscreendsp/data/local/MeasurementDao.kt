@@ -1,6 +1,7 @@
 package com.example.tvscreendsp.data.local
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -37,6 +38,13 @@ interface MeasurementDao {
      */
     @Update
     suspend fun update(measurement: MeasurementEntity)
+    
+    /**
+     * Deletes a measurement record.
+     * Note: This does NOT delete the WAV file - caller must handle file deletion.
+     */
+    @Delete
+    suspend fun delete(measurement: MeasurementEntity)
     
     /**
      * Retrieves a measurement by its ID.
@@ -85,6 +93,15 @@ interface MeasurementDao {
      */
     @Query("DELETE FROM measurements WHERE id = :id")
     suspend fun deleteById(id: Long): Int
+    
+    /**
+     * Updates the custom name of a measurement.
+     * 
+     * @param id The measurement ID
+     * @param customName The new custom name (null to clear)
+     */
+    @Query("UPDATE measurements SET customName = :customName WHERE id = :id")
+    suspend fun updateCustomName(id: Long, customName: String?)
     
     /**
      * Deletes all measurements.

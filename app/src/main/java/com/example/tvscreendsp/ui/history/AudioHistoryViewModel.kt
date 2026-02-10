@@ -111,6 +111,66 @@ class AudioHistoryViewModel(application: Application) : AndroidViewModel(applica
         _playingId.value = null
     }
     
+    // Dialog states
+    private val _showRenameDialog = MutableStateFlow<Long?>(null)
+    val showRenameDialog: StateFlow<Long?> = _showRenameDialog.asStateFlow()
+    
+    private val _showDeleteConfirm = MutableStateFlow<Long?>(null)
+    val showDeleteConfirm: StateFlow<Long?> = _showDeleteConfirm.asStateFlow()
+    
+    /**
+     * Show rename dialog for a measurement.
+     */
+    fun showRenameDialog(measurementId: Long) {
+        _showRenameDialog.value = measurementId
+    }
+    
+    /**
+     * Hide rename dialog.
+     */
+    fun hideRenameDialog() {
+        _showRenameDialog.value = null
+    }
+    
+    /**
+     * Rename a measurement.
+     */
+    fun renameMeasurement(measurementId: Long, newName: String) {
+        viewModelScope.launch {
+            repository.renameMeasurement(measurementId, newName)
+            hideRenameDialog()
+        }
+    }
+    
+    /**
+     * Show delete confirmation dialog.
+     */
+    fun showDeleteConfirm(measurementId: Long) {
+        _showDeleteConfirm.value = measurementId
+    }
+    
+    /**
+     * Hide delete confirmation dialog.
+     */
+    fun hideDeleteConfirm() {
+        _showDeleteConfirm.value = null
+    }
+    
+    /**
+     * Delete a measurement and its WAV file.
+     */
+    fun deleteMeasurement(measurement: MeasurementEntity) {
+        viewModelScope.launch {
+            // Stop playback if this measurement is playing
+            if (_playingId.value == measurement.id) {
+                stopPlayback()
+            }
+            
+            repository.deleteMeasurement(measurement)
+            hideDeleteConfirm()
+        }
+    }
+    
     override fun onCleared() {
         super.onCleared()
         stopPlayback()

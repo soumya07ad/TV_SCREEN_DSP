@@ -29,7 +29,13 @@ data class MeasurementEntity(
     val recordedAt: Long,
     
     /**
-     * Input source used for recording.
+     * Optional custom name for this recording.
+     * If null, display name is auto-generated from recordedAt timestamp.
+     */
+    val customName: String? = null,
+    
+    /**
+     * Source of the input audio.
      * Values: "MICROPHONE", "USB", "BLE"
      */
     val inputSource: String,
