@@ -80,6 +80,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     
     // Room
@@ -89,6 +90,9 @@ dependencies {
     
     // Accompanist (permissions)
     implementation(libs.accompanist.permissions)
+    
+    // Navigation
+    implementation(libs.androidx.navigation.compose)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

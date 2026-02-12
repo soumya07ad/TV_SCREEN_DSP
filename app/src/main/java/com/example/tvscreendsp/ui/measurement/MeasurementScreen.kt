@@ -202,7 +202,7 @@ private fun RecordingUI(
         )
         
         LinearProgressIndicator(
-            progress = progress / 100f,
+            progress = { progress / 100f },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp)
@@ -292,7 +292,7 @@ private fun ResultCard(result: com.example.tvscreendsp.data.model.DspResult) {
                 )
             }
             
-            Divider()
+            HorizontalDivider()
             
             // Frequency
             Row(

@@ -84,7 +84,7 @@ abstract class AppDatabase : RoomDatabase() {
             )
                 .addMigrations(MIGRATION_1_2)
                 // Fallback if migration fails (dev only)
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
         }
         

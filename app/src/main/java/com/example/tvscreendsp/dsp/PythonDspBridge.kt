@@ -102,47 +102,57 @@ object PythonDspBridge {
     /**
      * Convert Python dictionary to Kotlin DspResult.
      * 
+     * IMPORTANT: PyObject.get(String) calls Python getattr(), NOT dict[key].
+     * Must use asMap() to properly access Python dict entries.
+     * 
      * Python returns:
      * {
      *     "frequency": float,
      *     "power": float,
      *     "surface_tension": float,
      *     "noise_status": str,
-     *     "confidence": float,
-     *     "error": str (optional)
+     *     "confidence": float
      * }
      */
     private fun convertPyObjectToResult(pyDict: PyObject): DspResult? {
-        // Check for error in result
-        val error = pyDict.get("error")?.toString()
-        if (!error.isNullOrEmpty()) {
-            throw DspException("Python analysis error: $error")
+        try {
+            // Convert Python dict → Java Map for reliable key access
+            val map = pyDict.asMap()
+            
+            var frequency = 0.0
+            var power = -100.0
+            var surfaceTension = 0.0
+            var noiseStatus = "NOISE"
+            var confidence = 0.0
+            
+            for ((key, value) in map) {
+                when (key.toString()) {
+                    "error" -> {
+                        val errorMsg = value.toString()
+                        if (errorMsg.isNotEmpty() && errorMsg != "None") {
+                            throw DspException("Python analysis error: $errorMsg")
+                        }
+                    }
+                    "frequency" -> frequency = value.toDouble()
+                    "power" -> power = value.toDouble()
+                    "surface_tension" -> surfaceTension = value.toDouble()
+                    "noise_status" -> noiseStatus = value.toString()
+                    "confidence" -> confidence = value.toDouble()
+                }
+            }
+            
+            return DspResult(
+                frequency = frequency,
+                power = power,
+                surfaceTension = surfaceTension,
+                noiseStatus = noiseStatus,
+                confidence = confidence
+            )
+        } catch (e: DspException) {
+            throw e
+        } catch (e: Exception) {
+            throw DspException("Failed to parse DSP result: ${e.message}", e)
         }
-        
-        // Extract values from Python dict
-        // PyObject.toDouble()/toString() handle type conversion
-        val frequency = pyDict.get("frequency")?.toDouble() 
-            ?: throw DspException("Missing 'frequency' in DSP result")
-            
-        val power = pyDict.get("power")?.toDouble() 
-            ?: throw DspException("Missing 'power' in DSP result")
-            
-        val surfaceTension = pyDict.get("surface_tension")?.toDouble() 
-            ?: throw DspException("Missing 'surface_tension' in DSP result")
-            
-        val noiseStatus = pyDict.get("noise_status")?.toString() 
-            ?: throw DspException("Missing 'noise_status' in DSP result")
-            
-        val confidence = pyDict.get("confidence")?.toDouble() 
-            ?: throw DspException("Missing 'confidence' in DSP result")
-        
-        return DspResult(
-            frequency = frequency,
-            power = power,
-            surfaceTension = surfaceTension,
-            noiseStatus = noiseStatus,
-            confidence = confidence
-        )
     }
 }
 
