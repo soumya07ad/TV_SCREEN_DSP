@@ -94,6 +94,9 @@ dependencies {
     // Navigation
     implementation(libs.androidx.navigation.compose)
     
+    // USB Serial (mik3y/usb-serial-for-android)
+    implementation(libs.usb.serial)
+    
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

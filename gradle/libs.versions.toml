@@ -10,9 +10,10 @@ activityCompose = "1.12.3"
 composeBom = "2026.01.01"
 room = "2.8.4"
 ksp = "2.0.21-1.0.27"
-chaquopy = "16.0.0"
+chaquopy = "15.0.1"
 accompanist = "0.37.3"
 navigationCompose = "2.9.7"
+usbSerial = "3.8.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -39,6 +40,8 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 # Navigation
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+# USB Serial
+usb-serial = { group = "com.github.mik3y", name = "usb-serial-for-android", version.ref = "usbSerial" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

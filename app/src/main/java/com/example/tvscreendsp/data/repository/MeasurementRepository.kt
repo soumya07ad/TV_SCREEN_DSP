@@ -26,16 +26,22 @@ class MeasurementRepository(private val measurementDao: MeasurementDao) {
      * 
      * @param wavFilePath Absolute path to the saved WAV file
      * @param inputSource Input source used (MICROPHONE, USB, BLE)
+     * @param triggerCompleted True if hardware handshake completed successfully
+     * @param triggerLatencyMs Latency in ms between START and DONE (null if failed/manual)
      * @return The auto-generated ID of the new measurement
      */
     suspend fun createMeasurement(
         wavFilePath: String,
-        inputSource: String
+        inputSource: String,
+        triggerCompleted: Boolean = false,
+        triggerLatencyMs: Long? = null
     ): Long {
         val entity = MeasurementEntity(
             wavFilePath = wavFilePath,
             recordedAt = System.currentTimeMillis(),
-            inputSource = inputSource
+            inputSource = inputSource,
+            triggerCompleted = triggerCompleted,
+            triggerLatencyMs = triggerLatencyMs
         )
         return measurementDao.insert(entity)
     }

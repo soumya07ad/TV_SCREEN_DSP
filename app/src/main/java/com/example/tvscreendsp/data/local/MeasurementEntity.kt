@@ -1,5 +1,6 @@
 package com.example.tvscreendsp.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -77,7 +78,23 @@ data class MeasurementEntity(
      * Unix timestamp (milliseconds) when analysis completed.
      * Null if analysis has not been performed yet.
      */
-    val analysisCompletedAt: Long? = null
+    val analysisCompletedAt: Long? = null,
+
+    // ========== TRIGGER METADATA (handshake protocol) ==========
+
+    /**
+     * Whether the hardware handshake completed successfully.
+     * True if ESP32 responded with "DONE" after "START" command.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val triggerCompleted: Boolean = false,
+
+    /**
+     * Latency in milliseconds between sending START and receiving DONE.
+     * Null if handshake failed, timed out, or manual mode was used.
+     */
+    @ColumnInfo(name = "triggerLatencyMs")
+    val triggerLatencyMs: Long? = null
 ) {
     /**
      * Returns true if DSP analysis has been completed for this measurement.

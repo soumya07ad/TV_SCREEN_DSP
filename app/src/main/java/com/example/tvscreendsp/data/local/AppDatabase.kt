@@ -15,6 +15,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * 
  * ## Version History
  * - Version 1: Initial schema with MeasurementEntity
+ * - Version 2: Added customName column
+ * - Version 3: Added triggerCompleted and triggerLatencyMs columns
  * 
  * ## Migration Notes
  * When modifying the schema:
@@ -33,7 +35,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  */
 @Database(
     entities = [MeasurementEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -75,6 +77,20 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
+
+        /**
+         * Migration from version 2 to 3: Add trigger handshake metadata.
+         */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE measurements ADD COLUMN triggerCompleted INTEGER NOT NULL DEFAULT 0"
+                )
+                database.execSQL(
+                    "ALTER TABLE measurements ADD COLUMN triggerLatencyMs INTEGER"
+                )
+            }
+        }
         
         private fun buildDatabase(context: Context): AppDatabase {
             return Room.databaseBuilder(
@@ -82,7 +98,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 DATABASE_NAME
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 // Fallback if migration fails (dev only)
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()

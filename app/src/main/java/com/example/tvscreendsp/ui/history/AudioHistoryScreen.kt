@@ -185,6 +185,35 @@ private fun MeasurementListItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                // Trigger status indicator
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val (dotColor, triggerText) = when {
+                        measurement.triggerCompleted -> {
+                            MaterialTheme.colorScheme.primary to
+                                "Trigger OK • ${measurement.triggerLatencyMs ?: 0}ms"
+                        }
+                        measurement.inputSource == "USB" -> {
+                            MaterialTheme.colorScheme.error to "Trigger Failed"
+                        }
+                        else -> {
+                            MaterialTheme.colorScheme.outline to "Manual"
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier.size(8.dp),
+                        shape = MaterialTheme.shapes.extraSmall,
+                        color = dotColor
+                    ) {}
+                    Text(
+                        text = triggerText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 
                 // Status (if analyzed)
                 measurement.noiseStatus?.let { status ->
