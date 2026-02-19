@@ -1,7 +1,11 @@
 package com.example.tvscreendsp.ui.history
 
 import android.app.Application
+import android.content.Context
+import android.content.Intent
 import android.media.MediaPlayer
+import android.net.Uri
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.tvscreendsp.data.local.AppDatabase
@@ -171,6 +175,34 @@ class AudioHistoryViewModel(application: Application) : AndroidViewModel(applica
         }
     }
     
+    /**
+     * Share a WAV audio file using Android's share sheet.
+     * Uses FileProvider to expose the internal file to other apps.
+     */
+    fun shareMeasurement(context: Context, measurement: MeasurementEntity) {
+        val file = File(measurement.wavFilePath)
+        if (!file.exists()) return
+
+        val contentUri: Uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file
+        )
+
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "audio/wav"
+            putExtra(Intent.EXTRA_STREAM, contentUri)
+            putExtra(Intent.EXTRA_SUBJECT, "DSP Audio Recording")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        context.startActivity(
+            Intent.createChooser(shareIntent, "Share Audio File").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        )
+    }
+
     override fun onCleared() {
         super.onCleared()
         stopPlayback()

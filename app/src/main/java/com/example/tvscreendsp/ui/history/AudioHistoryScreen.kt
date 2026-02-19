@@ -9,10 +9,12 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -34,6 +36,7 @@ fun AudioHistoryScreen(
     val playingId by viewModel.playingId.collectAsStateWithLifecycle()
     val showRenameDialog by viewModel.showRenameDialog.collectAsStateWithLifecycle()
     val showDeleteConfirm by viewModel.showDeleteConfirm.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     
     DisposableEffect(Unit) {
         onDispose {
@@ -72,7 +75,8 @@ fun AudioHistoryScreen(
                         isPlaying = playingId == measurement.id,
                         onPlayToggle = { viewModel.togglePlayback(measurement) },
                         onEdit = { viewModel.showRenameDialog(measurement.id) },
-                        onDelete = { viewModel.showDeleteConfirm(measurement.id) }
+                        onDelete = { viewModel.showDeleteConfirm(measurement.id) },
+                        onShare = { viewModel.shareMeasurement(context, measurement) }
                     )
                 }
             }
@@ -140,7 +144,8 @@ private fun MeasurementListItem(
     isPlaying: Boolean,
     onPlayToggle: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onShare: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -248,7 +253,16 @@ private fun MeasurementListItem(
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
-                
+
+                // Share button
+                IconButton(onClick = onShare) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Share",
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
+                }
+
                 // Delete button
                 IconButton(onClick = onDelete) {
                     Icon(
