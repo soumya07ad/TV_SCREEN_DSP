@@ -65,8 +65,9 @@ chaquopy {
     defaultConfig {
         version = "3.8"
         
-        // No pip packages - using pure Python stdlib for DSP
-        // This avoids build complications with numpy compilation
+        pip {
+            install("numpy")
+        }
     }
 }
 
