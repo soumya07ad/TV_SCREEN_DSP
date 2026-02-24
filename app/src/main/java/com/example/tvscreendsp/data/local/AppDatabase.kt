@@ -36,7 +36,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [MeasurementEntity::class],
     version = 3,
-    exportSchema = true
+    exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     
@@ -100,7 +100,7 @@ abstract class AppDatabase : RoomDatabase() {
             )
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 // Fallback if migration fails (dev only)
-                .fallbackToDestructiveMigration(dropAllTables = true)
+                .fallbackToDestructiveMigration()
                 .build()
         }
         
