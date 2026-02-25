@@ -67,6 +67,10 @@ chaquopy {
         
         pip {
             install("numpy")
+<<<<<<< HEAD
+=======
+            install("tflite-runtime")
+>>>>>>> dev
         }
     }
 }
