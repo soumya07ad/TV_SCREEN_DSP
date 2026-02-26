@@ -68,15 +68,46 @@ def _istft(stft_matrix, hop_length=512, n_fft=2048, target_length=None):
     return output
 
 
-def highpass_filter(signal, sr, cutoff=200, order=4):
-    """High-pass filter using frequency-domain zeroing (numpy-only)."""
+def bandpass_filter(signal, sr, lowcut=800, highcut=14000, order=4):
+    """Band-pass filter using frequency-domain gain curve (numpy-only).
+    
+    Focuses on 800Hz - 14kHz to isolate glass tapping 'pings' 
+    and reject room talk/background rumble.
+    """
     n = len(signal)
+    if n == 0: return signal
     freqs = np.fft.rfftfreq(n, d=1.0 / sr)
     spectrum = np.fft.rfft(signal)
-    # Smooth roll-off using a Butterworth-like gain curve
-    gain = 1.0 / np.sqrt(1.0 + (cutoff / (freqs + 1e-10)) ** (2 * order))
-    spectrum *= gain
+    
+    # Butterworth-like roll-off in frequency domain
+    # Low-cut (high-pass part)
+    low_gain = 1.0 / np.sqrt(1.0 + (lowcut / (freqs + 1e-10)) ** (2 * order))
+    # High-cut (low-pass part)
+    high_gain = 1.0 / np.sqrt(1.0 + (freqs / (highcut + 1e-10)) ** (2 * order))
+    
+    spectrum *= (low_gain * high_gain)
     return np.fft.irfft(spectrum, n=n)
+
+
+def proximity_gate(signal, threshold_ratio=0.2, window_ms=20, sr=22050):
+    """Silences any window where peak amplitude is < threshold_ratio of the total peak.
+    
+    Effectively mutes background sounds between the loud taps.
+    """
+    if len(signal) == 0: return signal
+    
+    window_size = int((window_ms / 1000.0) * sr)
+    max_amp = np.max(np.abs(signal))
+    threshold = max_amp * threshold_ratio
+    
+    gated_signal = np.zeros_like(signal)
+    for i in range(0, len(signal), window_size):
+        end = min(i + window_size, len(signal))
+        window = signal[i:end]
+        if np.max(np.abs(window)) > threshold:
+            gated_signal[i:end] = window
+            
+    return gated_signal
 
 
 def noise_cancel(signal, sr, noise_duration=0.5, n_fft=2048, hop_length=512,
@@ -291,11 +322,21 @@ def analyze_audio(wav_path):
         signal, sr = read_wav_normalized(wav_path)
         print("[DSP] Audio loaded: %d samples, sr=%d" % (len(signal), sr))
 
-        # 2. Noise cancellation pipeline
+        # 2. Noise cancellation pipeline (Close-Range Optimized)
         print("[DSP] Running spectral-gate noise cancellation...")
         clean_signal = noise_cancel(signal, sr)
-        print("[DSP] Applying high-pass filter (cutoff=200Hz)...")
-        clean_signal = highpass_filter(clean_signal, sr, cutoff=200)
+        
+        print("[DSP] Applying band-pass filter (800Hz-14kHz)...")
+        clean_signal = bandpass_filter(clean_signal, sr, lowcut=800, highcut=14000)
+        
+        print("[DSP] Applying proximity gate (5cm energy gate)...")
+        clean_signal = proximity_gate(clean_signal, threshold_ratio=0.2, sr=sr)
+        
+        # Final Normalization to ensure model sees consistent volume
+        max_peak = np.max(np.abs(clean_signal))
+        if max_peak > 1e-6:
+            clean_signal = clean_signal / max_peak
+            
         print("[DSP] Noise cancellation complete!")
 
         # 3. Save denoised WAV
