@@ -1,71 +1,4 @@
 """
-<<<<<<< Updated upstream
-Pure Python DSP Analyzer for TV Screen Crack Detection
-No external dependencies - uses only Python standard library
-"""
-
-import wave
-import struct
-import math
-from typing import Dict
-
-
-def analyze_audio(wav_path: str) -> Dict:
-    """
-    Main entry point for audio analysis using pure Python.
-    
-    Returns dictionary with all 5 required keys:
-    - frequency, power, surface_tension, noise_status, confidence
-    """
-    try:
-        # Read WAV file
-        samples, sample_rate = read_wav(wav_path)
-        
-        # Handle empty/invalid files
-        if len(samples) == 0:
-            return {
-                "frequency": 0.0,
-                "power": -100.0,
-                "surface_tension": 0.0,
-                "noise_status": "NOISE",
-                "confidence": 0.0
-            }
-        
-        # Calculate power
-        power_db = calculate_power_db(samples)
-        
-        # Check for weak signal
-        if power_db < -50:
-            return {
-                "frequency": 0.0,
-                "power": float(power_db),
-                "surface_tension": 0.0,
-                "noise_status": "NOISE",
-                "confidence": 0.5
-            }
-        
-        # Autocorrelation-based frequency detection
-        frequency = find_dominant_frequency(samples, sample_rate)
-        
-        # Calculate spectral flatness
-        surface_tension = calculate_spectral_flatness(samples)
-        
-        # Classify
-        noise_status, confidence = classify_noise(
-            frequency, power_db, surface_tension
-        )
-        
-        return {
-            "frequency": float(frequency),
-            "power": float(power_db),
-            "surface_tension": float(surface_tension),
-            "noise_status": noise_status,
-            "confidence": float(confidence)
-        }
-        
-    except Exception:
-        # CRITICAL: Always return all required keys, never partial dict
-=======
 ML-based DSP Analyzer for TV Screen Crack Detection
 Uses TFLite for high-performance CNN inference.
 No external dependencies beyond NumPy and tflite-runtime (supported by Chaquopy).
@@ -95,6 +28,118 @@ N_MELS = 128
 # ============================================================
 # DSP Utilities
 # ============================================================
+
+# ============================================================
+# Noise Cancellation (spectral gating + high-pass, numpy-only)
+# ============================================================
+
+def _stft(signal, n_fft=2048, hop_length=512):
+    """Short-Time Fourier Transform."""
+    pad_len = n_fft // 2
+    padded = np.pad(signal, pad_len, mode='reflect')
+    n_frames = 1 + (len(padded) - n_fft) // hop_length
+    window = 0.5 * (1 - np.cos(2 * np.pi * np.arange(n_fft) / n_fft))  # Hann
+    frames = np.zeros((n_frames, n_fft))
+    for i in range(n_frames):
+        frames[i] = padded[i * hop_length : i * hop_length + n_fft] * window
+    return np.fft.rfft(frames, n=n_fft)  # (n_frames, n_fft//2+1)
+
+
+def _istft(stft_matrix, hop_length=512, n_fft=2048, target_length=None):
+    """Inverse STFT with overlap-add."""
+    window = 0.5 * (1 - np.cos(2 * np.pi * np.arange(n_fft) / n_fft))
+    n_frames = stft_matrix.shape[0]
+    expected_len = n_fft + hop_length * (n_frames - 1)
+    output = np.zeros(expected_len)
+    window_sum = np.zeros(expected_len)
+    for i in range(n_frames):
+        frame = np.fft.irfft(stft_matrix[i], n=n_fft) * window
+        start = i * hop_length
+        output[start:start + n_fft] += frame
+        window_sum[start:start + n_fft] += window ** 2
+    # Normalize by window overlap
+    nonzero = window_sum > 1e-8
+    output[nonzero] /= window_sum[nonzero]
+    # Remove padding from STFT
+    pad_len = n_fft // 2
+    output = output[pad_len:]
+    if target_length is not None:
+        output = output[:target_length]
+    return output
+
+
+def highpass_filter(signal, sr, cutoff=200, order=4):
+    """High-pass filter using frequency-domain zeroing (numpy-only)."""
+    n = len(signal)
+    freqs = np.fft.rfftfreq(n, d=1.0 / sr)
+    spectrum = np.fft.rfft(signal)
+    # Smooth roll-off using a Butterworth-like gain curve
+    gain = 1.0 / np.sqrt(1.0 + (cutoff / (freqs + 1e-10)) ** (2 * order))
+    spectrum *= gain
+    return np.fft.irfft(spectrum, n=n)
+
+
+def noise_cancel(signal, sr, noise_duration=0.5, n_fft=2048, hop_length=512,
+                 oversubtract=2.0, floor=0.1):
+    """
+    Spectral-gate noise reduction.
+
+    Uses the first `noise_duration` seconds as a noise profile estimate
+    (before the ESP tap begins), then applies a soft Wiener-style mask.
+
+    Parameters
+    ----------
+    signal : np.ndarray       – mono float32 signal in [-1, 1]
+    sr : int                  – sample rate
+    noise_duration : float    – seconds of leading audio used as noise reference
+    oversubtract : float      – noise oversubtraction factor (higher = more aggressive)
+    floor : float             – spectral floor to avoid musical noise artifacts
+    """
+    if len(signal) == 0:
+        return signal
+
+    # 1. STFT of full signal
+    S = _stft(signal, n_fft, hop_length)         # (n_frames, freq_bins)
+    mag = np.abs(S)
+    phase = np.angle(S)
+
+    # 2. Estimate noise spectrum from first N frames
+    noise_samples = int(noise_duration * sr)
+    noise_frames = max(1, noise_samples // hop_length)
+    noise_profile = np.mean(mag[:noise_frames], axis=0)  # average noise magnitude
+
+    # 3. Spectral subtraction with soft mask
+    #    mask = max(floor, 1 - oversubtract * noise / signal)
+    mask = 1.0 - oversubtract * (noise_profile[np.newaxis, :] / (mag + 1e-10))
+    mask = np.clip(mask, floor, 1.0)
+
+    # 4. Apply mask and reconstruct
+    cleaned_mag = mag * mask
+    cleaned_S = cleaned_mag * np.exp(1j * phase)
+
+    return _istft(cleaned_S, hop_length, n_fft, target_length=len(signal))
+
+
+def save_denoised_wav(signal, sr, original_path):
+    """Save denoised signal as WAV next to the original file.
+
+    Returns the path of the saved denoised file.
+    """
+    base, ext = os.path.splitext(original_path)
+    denoised_path = base + "_denoised" + ext
+
+    # Convert float32 [-1,1] to int16
+    int_signal = np.clip(signal * 32767, -32768, 32767).astype(np.int16)
+
+    import wave as _wave
+    with _wave.open(denoised_path, 'wb') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)  # 16-bit
+        wf.setframerate(sr)
+        wf.writeframes(int_signal.tobytes())
+
+    return denoised_path
+
 
 def read_wav_normalized(filepath):
     """Read WAV file and return float32 samples normalized to [-1, 1]."""
@@ -172,9 +217,18 @@ def get_mel_basis():
         _mel_basis = create_mel_filterbank(SAMPLE_RATE, N_FFT, N_MELS)
     return _mel_basis
 
-def extract_features(file_path):
-    """Extract Log-Mel Spectrogram matching training pipeline."""
-    signal, sr = read_wav_normalized(file_path)
+def extract_features(file_path, signal_override=None, sr_override=None):
+    """Extract Log-Mel Spectrogram matching training pipeline.
+
+    If *signal_override* is provided, it is used instead of reading from
+    *file_path* (allows reusing an already-denoised signal).
+    """
+    if signal_override is not None:
+        signal = signal_override
+        sr = sr_override if sr_override else SAMPLE_RATE
+    else:
+        signal, sr = read_wav_normalized(file_path)
+
     if sr != SAMPLE_RATE and sr > 0: signal = resample(signal, sr, SAMPLE_RATE)
     if len(signal) > SAMPLES: signal = signal[:SAMPLES]
     else: signal = np.pad(signal, (0, max(0, SAMPLES - len(signal))), "constant")
@@ -232,7 +286,25 @@ def predict_tflite(spec):
 
 def analyze_audio(wav_path):
     try:
-        spec = extract_features(wav_path)
+        # 1. Read raw audio
+        print("[DSP] Reading raw audio: %s" % wav_path)
+        signal, sr = read_wav_normalized(wav_path)
+        print("[DSP] Audio loaded: %d samples, sr=%d" % (len(signal), sr))
+
+        # 2. Noise cancellation pipeline
+        print("[DSP] Running spectral-gate noise cancellation...")
+        clean_signal = noise_cancel(signal, sr)
+        print("[DSP] Applying high-pass filter (cutoff=200Hz)...")
+        clean_signal = highpass_filter(clean_signal, sr, cutoff=200)
+        print("[DSP] Noise cancellation complete!")
+
+        # 3. Save denoised WAV
+        denoised_path = save_denoised_wav(clean_signal, sr, wav_path)
+        print("[DSP] Denoised WAV saved → %s" % denoised_path)
+
+        # 4. Extract features from denoised signal (skip re-reading file)
+        print("[DSP] Extracting Mel spectrogram from denoised signal...")
+        spec = extract_features(wav_path, signal_override=clean_signal, sr_override=sr)
         pred = predict_tflite(spec)
         
         class_idx = int(np.argmax(pred))
@@ -240,162 +312,22 @@ def analyze_audio(wav_path):
         
         f, p, s = _quick_stats(wav_path)
         
+        print("[DSP] Result: %s (confidence=%.2f%%)" % (
+            "NORMAL" if class_idx == 0 else "CRACK", confidence * 100))
+        
         return {
             "frequency": f,
             "power": p,
             "surface_tension": s,
             "noise_status": "NORMAL" if class_idx == 0 else "CRACK",
-            "confidence": confidence
+            "confidence": confidence,
+            "denoised_path": denoised_path
         }
     except Exception as e:
->>>>>>> Stashed changes
         return {
             "frequency": 0.0,
             "power": -100.0,
             "surface_tension": 0.0,
-<<<<<<< Updated upstream
-            "noise_status": "NOISE",
-            "confidence": 0.0
-        }
-
-
-def read_wav(filepath: str):
-    """Read WAV file and return normalized samples + sample rate."""
-    try:
-        with wave.open(filepath, 'rb') as wav:
-            n_channels = wav.getnchannels()
-            sample_width = wav.getsampwidth()
-            framerate = wav.getframerate()
-            n_frames = wav.getnframes()
-            
-            # Read all frames
-            raw_data = wav.readframes(n_frames)
-            
-            # Unpack based on sample width
-            if sample_width == 2:  # 16-bit PCM
-                fmt = f'{n_frames * n_channels}h'
-                samples = struct.unpack(fmt, raw_data)
-            else:
-                return [], 0
-            
-            # Convert to mono if stereo
-            if n_channels == 2:
-                samples = [samples[i] for i in range(0, len(samples), 2)]
-            
-            # Normalize to -1.0 to 1.0
-            max_val = 32768.0
-            normalized = [s / max_val for s in samples]
-            
-            return normalized, framerate
-            
-    except Exception:
-        return [], 0
-
-
-def calculate_power_db(samples):
-    """Calculate RMS power in dB."""
-    if not samples:
-        return -100.0
-    
-    # RMS
-    sum_squares = sum(s * s for s in samples)
-    rms = math.sqrt(sum_squares / len(samples))
-    
-    # Convert to dB (avoid log(0))
-    if rms < 1e-10:
-        return -100.0
-    
-    db = 20 * math.log10(rms)
-    return db
-
-
-def find_dominant_frequency(samples, sample_rate):
-    """
-    Find dominant frequency using autocorrelation.
-    Pure Python implementation without FFT.
-    """
-    if len(samples) < 100:
-        return 0.0
-    
-    # Use first 8192 samples for speed
-    chunk_size = min(8192, len(samples))
-    signal = samples[:chunk_size]
-    
-    # Autocorrelation for lag detection
-    max_lag = min(2000, chunk_size // 2)
-    max_corr = 0.0
-    best_lag = 0
-    
-    for lag in range(20, max_lag):  # Skip very low frequencies
-        correlation = sum(signal[i] * signal[i - lag] 
-                         for i in range(lag, len(signal)))
-        
-        if correlation > max_corr:
-            max_corr = correlation
-            best_lag = lag
-    
-    if best_lag == 0:
-        return 0.0
-    
-    frequency = sample_rate / best_lag
-    return frequency
-
-
-def calculate_spectral_flatness(samples):
-    """
-    Calculate spectral flatness (surface tension proxy).
-    Pure Python approximation using variance.
-    """
-    if len(samples) < 100:
-        return 0.0
-    
-    # Calculate variance as proxy for spectral spread
-    mean = sum(samples) / len(samples)
-    variance = sum((s - mean) ** 2 for s in samples) / len(samples)
-    
-    # Normalize to 0-1 range
-    # Higher variance = more noise-like = higher flatness
-    flatness = min(1.0, math.sqrt(variance) * 10)
-    
-    return flatness
-
-
-def classify_noise(frequency, power_db, surface_tension):
-    """
-    Rule-based classification.
-    
-    Returns:
-        (status, confidence)
-    """
-    
-    # Weak signal check
-    if power_db < -40:
-        return "NOISE", 0.6
-    
-    # Crack detection heuristics
-    crack_indicators = 0
-    
-    # High frequency content (cracks are sharp/transient)
-    if frequency > 1500:
-        crack_indicators += 1
-    
-    # High spectral flatness (noise-like)
-    if surface_tension > 0.6:
-        crack_indicators += 1
-    
-    # Strong signal
-    if power_db > -20:
-        crack_indicators += 1
-    
-    # Classification
-    if crack_indicators >= 2:
-        confidence = min(0.9, 0.5 + (crack_indicators * 0.2))
-        return "CRACK", confidence
-    elif crack_indicators == 1:
-        return "NORMAL", 0.7
-    else:
-        return "NORMAL", 0.8
-=======
             "noise_status": "ERROR",
             "confidence": 0.0,
             "error": str(e)
@@ -428,4 +360,3 @@ def _quick_stats(filepath):
         return freq, db, st
     except:
         return 0.0, -100.0, 0.0
->>>>>>> Stashed changes

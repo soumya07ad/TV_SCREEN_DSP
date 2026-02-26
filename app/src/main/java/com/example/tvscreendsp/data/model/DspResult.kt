@@ -31,7 +31,12 @@ data class DspResult(
     /**
      * Confidence score for the classification (0.0 - 1.0).
      */
-    val confidence: Double
+    val confidence: Double,
+    
+    /**
+     * Path to the noise-cancelled WAV file (null if denoising was skipped).
+     */
+    val denoisedFilePath: String? = null
 ) {
     /**
      * Returns true if the status indicates a crack was detected.

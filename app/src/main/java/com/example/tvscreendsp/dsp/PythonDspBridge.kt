@@ -124,6 +124,7 @@ object PythonDspBridge {
             var surfaceTension = 0.0
             var noiseStatus = "NOISE"
             var confidence = 0.0
+            var denoisedPath: String? = null
             
             for ((key, value) in map) {
                 when (key.toString()) {
@@ -138,6 +139,12 @@ object PythonDspBridge {
                     "surface_tension" -> surfaceTension = value.toDouble()
                     "noise_status" -> noiseStatus = value.toString()
                     "confidence" -> confidence = value.toDouble()
+                    "denoised_path" -> {
+                        val path = value.toString()
+                        if (path.isNotEmpty() && path != "None") {
+                            denoisedPath = path
+                        }
+                    }
                 }
             }
             
@@ -146,7 +153,8 @@ object PythonDspBridge {
                 power = power,
                 surfaceTension = surfaceTension,
                 noiseStatus = noiseStatus,
-                confidence = confidence
+                confidence = confidence,
+                denoisedFilePath = denoisedPath
             )
         } catch (e: DspException) {
             throw e
